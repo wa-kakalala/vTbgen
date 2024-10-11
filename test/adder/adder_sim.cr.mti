@@ -1,0 +1,15 @@
+C:/Users/wkk/Desktop/vTbgen/test/adder/adder.sv {1 {vlog -work work -vopt -sv -stats=none C:/Users/wkk/Desktop/vTbgen/test/adder/adder.sv
+QuestaSim-64 vlog 10.6c Compiler 2017.07 Jul 26 2017
+-- Compiling module adder
+
+Top level modules:
+	adder
+
+} {} {}} C:/Users/wkk/Desktop/vTbgen/test/adder/tb_adder.sv {1 {vlog -work work -vopt -sv -stats=none C:/Users/wkk/Desktop/vTbgen/test/adder/tb_adder.sv
+QuestaSim-64 vlog 10.6c Compiler 2017.07 Jul 26 2017
+-- Compiling module tb_adder
+
+Top level modules:
+	tb_adder
+
+} {} {}}

@@ -63,7 +63,7 @@ def portDeclare(inText ,portArr) :
     """
     port_definition = re.compile(
         r'\b' + portArr +
-        r''' (\s+(wire|reg)\s+)* (\s*signed\s+)*  (\s*\[.*?:.*?\]\s*)*
+        r''' (\s+(wire|reg|logic)\s+)* (\s*signed\s+)*  (\s*\[.*?:.*?\]\s*)*
         (?P<port_list>.*?)
         (?= \binput\b | \boutput\b | \binout\b | ; | \) )
         ''',
@@ -136,14 +136,30 @@ def formatPara(ParaList) :
                              %(i[0].ljust(l1 +1),i[1].ljust(l2 ))
                              for i in p])
         paraDef =  '#(\n' +',\n'.join( ['    .'+ i[0].ljust(l1 +1)
-                    + '( '+ i[0].ljust(l1 )+' )' for i in p])+ ')\n'
+                    + '( '+ i[0].ljust(l1 )+' )' for i in p])+ '\n)'
     else:
         l1 = 6
         l2 = 2
     preDec = '\n'.join( ['parameter %s = %s;\n'
                              %('PERIOD'.ljust(l1 +1), '10'.ljust(l2 ))])
-    paraDec = preDec + paraDec
+    paraTimout = '\n'.join( ['parameter %s = %s;\n'
+                             %('TIMEOUT'.ljust(l1 +1), '100000000'.ljust(l2 ))])
+    paraDec = preDec + paraTimout + paraDec
     return paraDec,paraDef
+
+def getClkRstName(InputList):
+    clk_name,rst_name= 'clk','rst_n'
+    clk_exist,rst_exist = 0,0
+    for in_port in InputList:
+        if "clk" in in_port or "CLK" in in_port:
+            clk_name = in_port
+            break
+
+    for in_port in InputList:
+        if "rst" in in_port or "RST" in in_port:
+            rst_name = in_port
+            break
+    return clk_name,rst_name,clk_exist,rst_exist
 
 def writeTestBench(input_file):
     """ write testbench to file """
@@ -171,10 +187,24 @@ def writeTestBench(input_file):
     output =  portDeclare(inText,ioPadAttr[1])
     inout  =  portDeclare(inText,ioPadAttr[2])
 
+    clk_name,rst_name,clk_exist,rst_exist = getClkRstName(input) 
+
+    # if not clk_exist:
+    #     input = [('clk','') ] + input
+    # if not rst_exist:
+    #     input = [('rst_n','') ] + input
     portList = formatPort( [input , output , inout] )
-    input  = formatDeclare(input ,'reg', '0' )
-    output = formatDeclare(output ,'wire')
-    inout  = formatDeclare(inout ,'wire')
+    # input  = formatDeclare(input ,'reg', '0' )
+    # output = formatDeclare(output ,'wire')
+    # inout  = formatDeclare(inout ,'wire')
+    input  = formatDeclare(input ,'logic', '0' )
+    output = formatDeclare(output ,'logic')
+    inout  = formatDeclare(inout ,'logic')
+
+    # if clk_exist == 0 :
+
+    # if rst_exist == 0:
+
 
     # write testbench
     timescale = '`timescale  1ns / 1ps\n'
@@ -185,7 +215,6 @@ def writeTestBench(input_file):
     # module_parameter_port_list
     if(paraDec!=''):
         print("// %s Parameters\n%s\n" % (name, paraDec))
-
     # list_of_port_declarations
     print("// %s Inputs\n%s\n"  % (name, input ))
     print("// %s Outputs\n%s\n" % (name, output))
@@ -194,29 +223,80 @@ def writeTestBench(input_file):
 
     # print clock
     clk = '''
-initial
-begin
-    forever #(PERIOD/2)  clk=~clk;
-end'''
+initial begin
+    forever #(PERIOD/2)  %s=~%s;
+end'''%(clk_name,clk_name)
+
     rst = '''
-initial
-begin
-    #(PERIOD*2) rst_n  =  1;
+initial begin
+    #(PERIOD*2) %s  <=  1'b1;
 end
-'''
-    print("%s\n%s" % (clk,rst))
+'''%(rst_name)
+    
+    timeout = '''
+int cnt = 0;
+initial begin
+    forever begin : timeout_block
+        @(posedge %s);
+        cnt += 1;
+        if( cnt > TIMEOUT ) begin
+            $display("timeout exception !!!");
+            disable timeout_block;
+        end
+    end
+end
+'''%(clk_name)
 
+    print("%s\n%s\n%s" % (clk,rst,timeout))
     # UUT
-    print("%s %s u_%s (\n%s\n);" %(name,paraDef,name,portList))
-
-    # print operation
-    operation = '''
-initial
-begin
-
-    $finish;
+    print("%s %s %s_inst (\n%s\n);" %(name,paraDef,name,portList))
+    
+    #  construct data
+    constructor = '''
+int tran_queue[$];
+int result_queue[$];
+int expect_queue[$];
+initial begin
+    // add data to tran_queue and expect_queue
 end
 '''
+    print("%s"%(constructor))
+    # checker
+    checker = '''
+event chk_event;
+bit not_match;
+initial begin
+    not_match = 0; 
+    @(chk_event);
+    if(  result_queue.size() != expect_queue.size() ) begin
+        $display("size not match -> result_queue : %d,expect_queue: %d",result_queue.size(),expect_queue.size());
+    end
+    
+    foreach(expect_queue[i]) begin
+        if( expect_queue[i] !== result_queue[i] ) begin
+            not_match = 1;
+            $display("**********fail**********");
+            break;
+        end
+    end
+    if( not_match == 0 ) begin
+        $display("**********pass**********");
+    end
+end
+'''
+    print("%s"%(checker))
+    operation = '''
+initial begin
+    wait(%s == 1'b1 );
+    @(posedge %s);
+    // driver code  
+
+    ->chk_event;
+    #(PERIOD);
+    $stop;
+end
+'''%(rst_name,clk_name)
+    # print operation
     print(operation)
     print("endmodule")
 

@@ -183,7 +183,3 @@ def writeTestBench(input_file):
 
     # UUT
     print("%s %s %s_inst (\n%s\n);" %(name,paraDef,name,portList))
-
-
-if __name__ == '__main__':
-    writeTestBench(sys.argv[1])

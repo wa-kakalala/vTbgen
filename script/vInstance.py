@@ -1,7 +1,6 @@
 #! /usr/bin/env python
-
 '''
-vTbgenerator.py -- generate verilog module Testbench
+vInstance.py -- generate verilog module Testbench
 generated bench file like this:
 
         fifo_sc #(
@@ -20,10 +19,9 @@ generated bench file like this:
         );
 
 Usage:
-      python vTbgenerator.py ModuleFileName.v
+      python vInstance.py ModuleFileName.v
 
 '''
-
 import re
 import sys
 import chardet
@@ -148,8 +146,8 @@ def writeTestBench(input_file):
     inText = delBlock  (inText)
 
     # moduel ... endmodule  #
-    moPos_begin = re.search(r'(\b|^)module\b', inText ).end()
-    moPos_end   = re.search(r'\bendmodule\b', inText ).start()
+    moPos_begin = re.search(r'(\b|^)module(\b|$)', inText ).end()
+    moPos_end   = re.search(r'(\b|^)endmodule(\b|$)', inText ).start()
     inText = inText[moPos_begin:moPos_end]
 
     name  = findName(inText)
